@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>壁掛けモード | かぞくカレンダー</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#23262b">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
@@ -25,29 +27,16 @@
     overflow: hidden;
   }
 
-  /* --- 背景スライドショー --- */
-  #slideBg {
+  /* --- 背景色レイヤー --- */
+  #bgLayer {
     position: fixed; inset: 0;
     z-index: 0;
+    transition: background-color 0.6s ease;
   }
-  #slideBg img {
-    position: absolute; inset: 0;
-    width: 100%; height: 100%;
-    object-fit: cover;
-    opacity: 0;
-    transition: opacity 2.2s ease;
-  }
-  #slideBg img.active { opacity: 1; }
-  #slideBg::after {
+  #bgLayer::after {
     content: '';
     position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(20,20,24,0.15) 0%, rgba(20,20,24,0.55) 100%);
-  }
-  #noPhotoMsg {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    color: rgba(255,255,255,0.25);
-    font-size: 16px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0.18) 100%);
   }
 
   /* --- メインレイアウト --- */
@@ -153,15 +142,46 @@
     width: 320px; text-align: center;
   }
   .setup-card p { font-size: 13px; color: rgba(255,255,255,0.6); margin: 0 0 16px; }
-  .setup-card input {
-    width: 100%; padding: 10px 12px; margin-bottom: 12px;
-    border-radius: 10px; border: none; font-size: 13px;
-    background: #40444d; color: #fff; font-family: inherit;
-  }
   .setup-card button {
     width: 100%; padding: 11px; border: none; border-radius: 999px;
     background: var(--mint); color: var(--mint-text);
     font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+
+  /* --- 背景テーマ選択パネル --- */
+  .theme-panel {
+    position: fixed; inset: 0; z-index: 20;
+    background: rgba(20,20,24,0.92);
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .theme-panel.open { display: flex; }
+  .theme-panel-card {
+    background: #2e3138; border-radius: 20px; padding: 24px;
+    width: 100%; max-width: 400px;
+  }
+  .theme-panel-card h3 { font-size: 16px; margin: 0 0 4px; color: #fff; }
+  .theme-panel-card .sub { font-size: 12px; color: rgba(255,255,255,0.5); margin: 0 0 18px; }
+
+  .theme-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  }
+  .theme-swatch {
+    border-radius: 14px; padding: 16px 8px;
+    cursor: pointer; text-align: center;
+    border: 2.5px solid transparent;
+  }
+  .theme-swatch.selected { border-color: #fff; }
+  .theme-swatch .preview {
+    width: 100%; height: 34px; border-radius: 8px; margin-bottom: 8px;
+  }
+  .theme-swatch .label { font-size: 11.5px; color: rgba(255,255,255,0.75); }
+
+  .theme-panel-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
+  .theme-panel-actions button {
+    background: none; border: none; color: rgba(255,255,255,0.6);
+    font-size: 13px; cursor: pointer; font-family: inherit;
   }
 
   @media (max-width: 700px) {
@@ -173,7 +193,7 @@
 </head>
 <body>
 
-<div id="slideBg"><div id="noPhotoMsg" style="display:none;">写真がまだありません</div></div>
+<div id="bgLayer"></div>
 
 <div class="stage">
   <div class="top-row">
@@ -191,29 +211,52 @@
 
 <div class="controls">
   <a href="calendar.html" style="color:#fff; text-decoration:none; background:rgba(0,0,0,0.35); width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px;" title="カレンダーに戻る">←</a>
+  <button id="themeBtn" title="背景の色を変える">🎨</button>
   <button id="fullscreenBtn" title="全画面表示">⛶</button>
 </div>
 
 <div class="setup-overlay" id="setupOverlay">
   <div class="setup-card">
-    <p>写真の表示に使う<br>宅内NASサーバーのアドレスを入力してください</p>
-    <input type="text" id="nasUrl" value="http://localhost:5000" placeholder="http://192.168.x.x:5000">
+    <p>タップして壁掛けモードを開始してください<br>（全画面表示とスリープ防止が有効になります）</p>
     <button id="startBtn">壁掛けモードを開始</button>
+  </div>
+</div>
+
+<div class="theme-panel" id="themePanel">
+  <div class="theme-panel-card">
+    <h3>背景の色</h3>
+    <p class="sub">家族みんなの画面に反映されます</p>
+
+    <div class="theme-grid" id="themeGrid"></div>
+
+    <div class="theme-panel-actions">
+      <button id="closeThemePanelBtn">閉じる</button>
+    </div>
   </div>
 </div>
 
 <script type="module">
   import { auth, db } from "./js/firebase-config.js";
   import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { doc, getDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { doc, getDoc, updateDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const $ = (id) => document.getElementById(id);
   const COLOR_KEYS = ['pink', 'mint', 'blue', 'yellow', 'purple'];
   const ASSIGNEE_ICON = { dad: '👨', mom: '👩', kid: '👦', all: '👪' };
 
+  const THEMES = [
+    { key: 'charcoal', label: 'チャコール', bg: '#23262b', text: '#ffffff' },
+    { key: 'blush',    label: 'ブラッシュ', bg: '#8a5a63', text: '#ffffff' },
+    { key: 'sage',     label: 'セージ',     bg: '#5c6e52', text: '#ffffff' },
+    { key: 'sky',      label: 'スカイ',     bg: '#4d6f8f', text: '#ffffff' },
+    { key: 'sand',     label: 'サンド',     bg: '#8a6f3f', text: '#ffffff' },
+    { key: 'plum',     label: 'プラム',     bg: '#5c4a6e', text: '#ffffff' },
+  ];
+  const DEFAULT_THEME = 'charcoal';
+
   let familyId = null;
-  let nasUrl = 'http://localhost:5000';
   let events = [];
+  let currentTheme = DEFAULT_THEME;
 
   // --- 認証チェック ---
   onAuthStateChanged(auth, async (user) => {
@@ -222,6 +265,7 @@
     if (!userDoc.exists() || !userDoc.data().familyId) { window.location.href = 'login.html'; return; }
     familyId = userDoc.data().familyId;
     subscribeEvents();
+    subscribeTheme();
   });
 
   function subscribeEvents() {
@@ -273,49 +317,50 @@
   // 日付が変わったら「今日の予定」を再計算する
   setInterval(renderToday, 60 * 1000);
 
-  // --- 写真スライドショー(宅内NASから取得、5分ごとに再取得して自動更新) ---
-  let slidePhotos = [];
-  let slideIndex = 0;
+  // --- 背景テーマ ---
+  function applyTheme(themeKey) {
+    const theme = THEMES.find(t => t.key === themeKey) || THEMES.find(t => t.key === DEFAULT_THEME);
+    currentTheme = theme.key;
+    $('bgLayer').style.backgroundColor = theme.bg;
+    document.body.style.color = theme.text;
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', theme.bg);
+    renderThemeGrid();
+  }
 
-  async function loadPhotos() {
+  function subscribeTheme() {
+    onSnapshot(doc(db, 'families', familyId), (snap) => {
+      const data = snap.data() || {};
+      applyTheme(data.wallTheme || DEFAULT_THEME);
+    });
+  }
+
+  function renderThemeGrid() {
+    const grid = $('themeGrid');
+    grid.innerHTML = THEMES.map(t => `
+      <div class="theme-swatch ${t.key === currentTheme ? 'selected' : ''}" data-key="${t.key}">
+        <div class="preview" style="background:${t.bg};"></div>
+        <div class="label">${t.label}</div>
+      </div>
+    `).join('');
+    grid.querySelectorAll('.theme-swatch').forEach(el => {
+      el.addEventListener('click', () => selectTheme(el.dataset.key));
+    });
+  }
+
+  async function selectTheme(themeKey) {
+    applyTheme(themeKey); // 即座に反映(体感を良くするため)
     try {
-      const res = await fetch(`${nasUrl.replace(/\/$/, '')}/photos`);
-      if (!res.ok) throw new Error('failed');
-      const data = await res.json();
-      if (data.length) {
-        slidePhotos = data;
-        $('noPhotoMsg').style.display = 'none';
-        buildSlides();
-      } else {
-        $('noPhotoMsg').style.display = 'flex';
-      }
+      await updateDoc(doc(db, 'families', familyId), { wallTheme: themeKey });
     } catch (err) {
-      $('noPhotoMsg').textContent = 'NASサーバーに接続できません';
-      $('noPhotoMsg').style.display = 'flex';
+      alert('背景色の保存に失敗しました: ' + err.message);
     }
   }
 
-  function buildSlides() {
-    const bg = $('slideBg');
-    bg.querySelectorAll('img').forEach(img => img.remove());
-    slidePhotos.forEach((p, i) => {
-      const img = document.createElement('img');
-      img.src = p.url;
-      if (i === 0) img.classList.add('active');
-      bg.appendChild(img);
-    });
-    slideIndex = 0;
-  }
-
-  function nextSlide() {
-    const imgs = document.querySelectorAll('#slideBg img');
-    if (!imgs.length) return;
-    imgs[slideIndex].classList.remove('active');
-    slideIndex = (slideIndex + 1) % imgs.length;
-    imgs[slideIndex].classList.add('active');
-  }
-  setInterval(nextSlide, 12000);
-  setInterval(loadPhotos, 5 * 60 * 1000); // 5分ごとに新着写真を自動反映
+  $('themeBtn').addEventListener('click', () => {
+    $('themePanel').classList.add('open');
+    renderThemeGrid();
+  });
+  $('closeThemePanelBtn').addEventListener('click', () => $('themePanel').classList.remove('open'));
 
   // --- 全画面表示 ---
   $('fullscreenBtn').addEventListener('click', () => {
@@ -344,12 +389,20 @@
 
   // --- 起動 ---
   $('startBtn').addEventListener('click', () => {
-    nasUrl = $('nasUrl').value.trim() || 'http://localhost:5000';
     $('setupOverlay').style.display = 'none';
     requestWakeLock();
-    loadPhotos();
     document.documentElement.requestFullscreen().catch(() => {});
   });
+</script>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch((err) => {
+        console.warn("Service Workerの登録に失敗しました:", err);
+      });
+    });
+  }
 </script>
 
 </body>
