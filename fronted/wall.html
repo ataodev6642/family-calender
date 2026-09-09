@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>壁掛けモード | かぞくカレンダー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pink: #f7c6d0;   --pink-text: #b85c73;
+    --mint: #c7e8dc;   --mint-text: #4c8a75;
+    --blue: #cddff5;   --blue-text: #5b7fb0;
+    --yellow: #f5e6bd; --yellow-text: #ad8b3a;
+    --purple: #ded3f0; --purple-text: #8570ad;
+    --ink-soft: rgba(255,255,255,0.7);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: #23262b;
+    color: #fff;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    overflow: hidden;
+  }
+
+  /* --- 背景スライドショー --- */
+  #slideBg {
+    position: fixed; inset: 0;
+    z-index: 0;
+  }
+  #slideBg img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 2.2s ease;
+  }
+  #slideBg img.active { opacity: 1; }
+  #slideBg::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(20,20,24,0.15) 0%, rgba(20,20,24,0.55) 100%);
+  }
+  #noPhotoMsg {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.25);
+    font-size: 16px;
+  }
+
+  /* --- メインレイアウト --- */
+  .stage {
+    position: relative;
+    z-index: 1;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 40px 48px;
+  }
+
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; }
+
+  .clock-block { text-shadow: 0 2px 20px rgba(0,0,0,0.35); }
+  .clock {
+    font-size: 88px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.01em;
+  }
+  .date {
+    font-size: 20px;
+    font-weight: 500;
+    margin-top: 8px;
+    color: var(--ink-soft);
+  }
+
+  .weather-block {
+    text-align: right;
+    text-shadow: 0 2px 16px rgba(0,0,0,0.3);
+  }
+  .weather-temp { font-size: 40px; font-weight: 700; }
+  .weather-desc { font-size: 14px; color: var(--ink-soft); }
+
+  /* --- 今日の予定パネル --- */
+  .today-panel {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.14);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-radius: 24px;
+    padding: 22px 26px;
+    max-width: 460px;
+    width: 100%;
+  }
+  .today-panel h2 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0 0 14px;
+    color: rgba(255,255,255,0.9);
+  }
+  .today-list { display: flex; flex-direction: column; gap: 10px; max-height: 260px; overflow-y: auto; }
+
+  .today-item {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14.5px;
+  }
+  .today-item .time {
+    font-weight: 700; min-width: 46px;
+    color: rgba(255,255,255,0.85);
+  }
+  .today-item .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot.c-pink   { background: var(--pink); }
+  .dot.c-mint   { background: var(--mint); }
+  .dot.c-blue   { background: var(--blue); }
+  .dot.c-yellow { background: var(--yellow); }
+  .dot.c-purple { background: var(--purple); }
+
+  .today-item .title { flex: 1; color: #fff; }
+  .today-item .assignee { font-size: 15px; }
+
+  .today-empty { font-size: 13.5px; color: rgba(255,255,255,0.5); }
+
+  /* --- コントロール(隅にひっそり) --- */
+  .controls {
+    position: fixed;
+    top: 16px; right: 16px;
+    z-index: 5;
+    display: flex; gap: 8px;
+    opacity: 0.25;
+    transition: opacity 0.2s ease;
+  }
+  .controls:hover { opacity: 0.9; }
+  .controls button {
+    background: rgba(0,0,0,0.35);
+    border: none; color: #fff;
+    width: 34px; height: 34px; border-radius: 50%;
+    cursor: pointer; font-size: 14px;
+  }
+
+  .setup-overlay {
+    position: fixed; inset: 0; z-index: 10;
+    background: rgba(20,20,24,0.92);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .setup-card {
+    background: #2e3138; padding: 28px; border-radius: 20px;
+    width: 320px; text-align: center;
+  }
+  .setup-card p { font-size: 13px; color: rgba(255,255,255,0.6); margin: 0 0 16px; }
+  .setup-card input {
+    width: 100%; padding: 10px 12px; margin-bottom: 12px;
+    border-radius: 10px; border: none; font-size: 13px;
+    background: #40444d; color: #fff; font-family: inherit;
+  }
+  .setup-card button {
+    width: 100%; padding: 11px; border: none; border-radius: 999px;
+    background: var(--mint); color: var(--mint-text);
+    font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+
+  @media (max-width: 700px) {
+    .clock { font-size: 56px; }
+    .stage { padding: 24px; }
+    .today-panel { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div id="slideBg"><div id="noPhotoMsg" style="display:none;">写真がまだありません</div></div>
+
+<div class="stage">
+  <div class="top-row">
+    <div class="clock-block">
+      <div class="clock" id="clock">--:--</div>
+      <div class="date" id="dateLabel"></div>
+    </div>
+  </div>
+
+  <div class="today-panel">
+    <h2>今日の予定</h2>
+    <div class="today-list" id="todayList"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <a href="calendar.html" style="color:#fff; text-decoration:none; background:rgba(0,0,0,0.35); width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px;" title="カレンダーに戻る">←</a>
+  <button id="fullscreenBtn" title="全画面表示">⛶</button>
+</div>
+
+<div class="setup-overlay" id="setupOverlay">
+  <div class="setup-card">
+    <p>写真の表示に使う<br>宅内NASサーバーのアドレスを入力してください</p>
+    <input type="text" id="nasUrl" value="http://localhost:5000" placeholder="http://192.168.x.x:5000">
+    <button id="startBtn">壁掛けモードを開始</button>
+  </div>
+</div>
+
+<script type="module">
+  import { auth, db } from "./js/firebase-config.js";
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { doc, getDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const $ = (id) => document.getElementById(id);
+  const COLOR_KEYS = ['pink', 'mint', 'blue', 'yellow', 'purple'];
+  const ASSIGNEE_ICON = { dad: '👨', mom: '👩', kid: '👦', all: '👪' };
+
+  let familyId = null;
+  let nasUrl = 'http://localhost:5000';
+  let events = [];
+
+  // --- 認証チェック ---
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) { window.location.href = 'login.html'; return; }
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    if (!userDoc.exists() || !userDoc.data().familyId) { window.location.href = 'login.html'; return; }
+    familyId = userDoc.data().familyId;
+    subscribeEvents();
+  });
+
+  function subscribeEvents() {
+    onSnapshot(collection(db, 'families', familyId, 'events'), (snap) => {
+      events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderToday();
+    });
+  }
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function renderToday() {
+    const list = $('todayList');
+    const todays = events
+      .filter(e => e.date === todayStr())
+      .sort((a, b) => (a.allDay ? '00:00' : a.start).localeCompare(b.allDay ? '00:00' : b.start));
+
+    if (!todays.length) {
+      list.innerHTML = '<div class="today-empty">今日の予定はありません</div>';
+      return;
+    }
+    list.innerHTML = todays.map(e => `
+      <div class="today-item">
+        <span class="time">${e.allDay ? '終日' : escapeHtml(e.start)}</span>
+        <span class="dot c-${e.color}"></span>
+        <span class="title">${escapeHtml(e.title)}</span>
+        <span class="assignee">${ASSIGNEE_ICON[e.assignee] || ''}</span>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // --- 時計(常時表示) ---
+  function tickClock() {
+    const now = new Date();
+    $('clock').textContent = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    const weekdays = ['日','月','火','水','木','金','土'];
+    $('dateLabel').textContent = `${now.getMonth()+1}月${now.getDate()}日（${weekdays[now.getDay()]}）`;
+  }
+  setInterval(tickClock, 1000);
+  tickClock();
+
+  // 日付が変わったら「今日の予定」を再計算する
+  setInterval(renderToday, 60 * 1000);
+
+  // --- 写真スライドショー(宅内NASから取得、5分ごとに再取得して自動更新) ---
+  let slidePhotos = [];
+  let slideIndex = 0;
+
+  async function loadPhotos() {
+    try {
+      const res = await fetch(`${nasUrl.replace(/\/$/, '')}/photos`);
+      if (!res.ok) throw new Error('failed');
+      const data = await res.json();
+      if (data.length) {
+        slidePhotos = data;
+        $('noPhotoMsg').style.display = 'none';
+        buildSlides();
+      } else {
+        $('noPhotoMsg').style.display = 'flex';
+      }
+    } catch (err) {
+      $('noPhotoMsg').textContent = 'NASサーバーに接続できません';
+      $('noPhotoMsg').style.display = 'flex';
+    }
+  }
+
+  function buildSlides() {
+    const bg = $('slideBg');
+    bg.querySelectorAll('img').forEach(img => img.remove());
+    slidePhotos.forEach((p, i) => {
+      const img = document.createElement('img');
+      img.src = p.url;
+      if (i === 0) img.classList.add('active');
+      bg.appendChild(img);
+    });
+    slideIndex = 0;
+  }
+
+  function nextSlide() {
+    const imgs = document.querySelectorAll('#slideBg img');
+    if (!imgs.length) return;
+    imgs[slideIndex].classList.remove('active');
+    slideIndex = (slideIndex + 1) % imgs.length;
+    imgs[slideIndex].classList.add('active');
+  }
+  setInterval(nextSlide, 12000);
+  setInterval(loadPhotos, 5 * 60 * 1000); // 5分ごとに新着写真を自動反映
+
+  // --- 全画面表示 ---
+  $('fullscreenBtn').addEventListener('click', () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  });
+
+  // --- スリープ防止(対応ブラウザのみ。非対応でも他機能は問題なく動く) ---
+  let wakeLock = null;
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    } catch (err) {
+      console.warn('スリープ防止が有効化できませんでした:', err.message);
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && wakeLock === null) requestWakeLock();
+  });
+
+  // --- 起動 ---
+  $('startBtn').addEventListener('click', () => {
+    nasUrl = $('nasUrl').value.trim() || 'http://localhost:5000';
+    $('setupOverlay').style.display = 'none';
+    requestWakeLock();
+    loadPhotos();
+    document.documentElement.requestFullscreen().catch(() => {});
+  });
+</script>
+
+</body>
+</html>
