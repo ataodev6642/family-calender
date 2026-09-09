@@ -5,12 +5,12 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-aut
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "ここに貼り付け",
-  authDomain: "ここに貼り付け",
-  projectId: "ここに貼り付け",
-  storageBucket: "ここに貼り付け",
-  messagingSenderId: "ここに貼り付け",
-  appId: "ここに貼り付け",
+  apiKey: "AIzaSyDa4wZS2BhWviEQ-pMX9Fxkq5uXoNgVMZk",
+  authDomain: "family-calender-e5eec.firebaseapp.com",
+  projectId: "family-calender-e5eec",
+  storageBucket: "family-calender-e5eec.firebasestorage.app",
+  messagingSenderId: "1079640161123",
+  appId: "1:1079640161123:web:e389b56fe7c418458cf156",
 };
 
 export const app = initializeApp(firebaseConfig);
